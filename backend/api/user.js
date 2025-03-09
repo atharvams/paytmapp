@@ -100,6 +100,11 @@ userRouter.post("/signin", async (req, res) => {
     });
   }
 
+  if (userFound.password != req.body.password) {
+    return res.status(401).json({
+      message: "Wrong cred!",
+    });
+  }
   const jwtToken = jwt.sign({ id: userFound._id }, jwtSecret);
 
   return res.status(200).json({
@@ -128,36 +133,36 @@ userRouter.put("/", middleware, async (req, res) => {
   });
 });
 
-userRouter.get("/bulk", async (req, res) => {
+userRouter.get("/bulk", middleware, async (req, res) => {
   const queryParam = req.query.filter || "";
-  const filter = "/.*" + queryParam + ".*/";
-  const users = null;
+  const filter = ".*" + queryParam + ".*";
+
   try {
-    users = await user.find({
+    const users = await user.find({
       $or: [
         {
-          username: { $regx: filter },
+          username: { $regex: filter, $options: "i" },
         },
         {
-          lastname: { $regx: filter },
+          lastname: { $regex: filter, $options: "i" },
         },
         {
-          firstname: { $regx: filter },
+          firstname: { $regex: filter, $options: "i" },
         },
       ],
     });
+    
+    return res.json({
+      users: users.map((user) => ({
+        username: user.username,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        id: user._id,
+      })),
+    });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: "Search error!",
     });
   }
-
-  return res.json({
-    users: users.map((user) => ({
-      username: user.username,
-      firstname: user.firstname,
-      lastname: user.lastname,
-      id: user._id,
-    })),
-  });
 });
