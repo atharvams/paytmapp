@@ -3,7 +3,8 @@ import z, { string } from "zod";
 // import user from './db'
 import jwt from "jsonwebtoken";
 import "dotenv/config";
-import { user } from "../db.js";
+import { account, user } from "../db.js";
+import middleware from "../middleware.js";
 
 export const userRouter = Router();
 
@@ -19,8 +20,13 @@ const userSignSchema = z.object({
   password: z.string().min(4),
 });
 
+const updateUserSchema = z.object({
+  password: z.string().optional(),
+  firstname: z.string().optional(),
+  lastname: z.string().optional(),
+});
+
 const jwtSecret = process.env.JWT_SECRET;
-console.log(jwtSecret);
 
 userRouter.get("/", (req, res) => {
   console.log("hello this is bootstrapped app.");
@@ -56,6 +62,11 @@ userRouter.post("/signup", async (req, res) => {
   });
 
   const userId = newUser._id;
+
+  await account.create({
+    userId: userId,
+    amount: Math.round((1 + Math.random() * 10000) * 1000) / 1000,
+  });
 
   const jwtToken = jwt.sign(
     {
@@ -93,5 +104,60 @@ userRouter.post("/signin", async (req, res) => {
 
   return res.status(200).json({
     token: jwtToken,
+  });
+});
+
+userRouter.put("/", middleware, async (req, res) => {
+  const { success } = updateUserSchema.safeParse(req.body);
+
+  if (!success) {
+    return res.status(411).json({
+      message: "Insufficient info.",
+    });
+  }
+
+  await user.updateOne(
+    {
+      _id: req.userId,
+    },
+    req.body
+  );
+
+  res.json({
+    message: "Updated successfully",
+  });
+});
+
+userRouter.get("/bulk", async (req, res) => {
+  const queryParam = req.query.filter || "";
+  const filter = "/.*" + queryParam + ".*/";
+  const users = null;
+  try {
+    users = await user.find({
+      $or: [
+        {
+          username: { $regx: filter },
+        },
+        {
+          lastname: { $regx: filter },
+        },
+        {
+          firstname: { $regx: filter },
+        },
+      ],
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Search error!",
+    });
+  }
+
+  return res.json({
+    users: users.map((user) => ({
+      username: user.username,
+      firstname: user.firstname,
+      lastname: user.lastname,
+      id: user._id,
+    })),
   });
 });
