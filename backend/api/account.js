@@ -23,6 +23,7 @@ accountRouter.get("/balance", middleware, async (req, res) => {
 
 accountRouter.post("/transfer", middleware, async (req, res) => {
   const { amount, to } = req.body;
+  console.log(amount, to);
   const session = await mongoose.startSession();
   session.startTransaction();
 

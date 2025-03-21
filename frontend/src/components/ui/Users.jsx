@@ -1,11 +1,24 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Button from "./Button";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 function Users() {
-  const dummyData = [
-    { username: "Pandu", firstname: "Pandu", lastname: "Param", _id: 1 },
-  ];
-  const [users, setUsers] = useState(dummyData);
+  const [users, setUsers] = useState([]);
+  const [searchText, setSearchText] = useState("");
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:3000/api/v1/user/bulk?filter=" + searchText, {
+        headers: {
+          Authorization: "Bearer " + localStorage.getItem("Token"),
+        },
+      })
+      .then((response) => {
+        console.log(response.data.users);
+        setUsers(response.data.users);
+      });
+  }, [searchText]);
 
   return (
     <>
@@ -14,12 +27,15 @@ function Users() {
         <input
           type="text"
           placeholder="Search"
+          onChange={(e) => {
+            setSearchText(e.target.value);
+          }}
           className="w-full text-md border border-slate-300 px-2 py-1 rounded-md"
         />
       </div>
       <div className="w-full">
         {users.map((user) => (
-          <User key={user._id} user={user} />
+          <User key={user.id} user={user} />
         ))}
       </div>
     </>
@@ -27,7 +43,7 @@ function Users() {
 }
 
 function User({ user }) {
-  console.log(user);
+  const navigate = useNavigate();
   return (
     <>
       <div className="flex justify-between mt-2">
@@ -45,7 +61,12 @@ function User({ user }) {
         </div>
 
         <div className="flex justify-center items-center h-ful">
-          <Button label={"Send Money"} onClick={() => {}} />
+          <Button
+            label={"Send Money"}
+            onClick={() => {
+              navigate("/send?id=" + user.id + "&firstname=" + user.firstname);
+            }}
+          />
         </div>
       </div>
     </>

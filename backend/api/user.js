@@ -89,8 +89,6 @@ userRouter.post("/signup", async (req, res) => {
 });
 
 userRouter.post("/signin", async (req, res) => {
-  
-
   const signInSchemaVerification = userSignSchema.safeParse(req.body);
 
   if (!signInSchemaVerification.success) {
@@ -180,5 +178,32 @@ userRouter.get("/bulk", middleware, async (req, res) => {
     return res.status(500).json({
       message: "Search error!",
     });
+  }
+});
+
+userRouter.get("/me", middleware, async (req, res) => {
+  const userId = req.userId;
+  try {
+    const existingUser = await user.findOne({
+      _id: userId,
+    });
+
+    if (!existingUser) {
+      return res.json({ message: "No user found" });
+    }
+    console.log(existingUser);
+
+    return res.json({
+      id: existingUser._id,
+      username: existingUser.username,
+      firstname: existingUser.firstname,
+      lastname: existingUser.lastname,
+    });
+  } catch (error) {
+    res
+      .json({
+        message: "Internal server error",
+      })
+      .status(500);
   }
 });
