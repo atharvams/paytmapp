@@ -1,6 +1,5 @@
 import { Router } from "express";
 import z, { string } from "zod";
-// import user from './db'
 import jwt from "jsonwebtoken";
 import "dotenv/config";
 import { account, user } from "../db.js";
@@ -38,78 +37,95 @@ userRouter.get("/", (req, res) => {
 userRouter.post("/signup", async (req, res) => {
   const verified = userSignupSchema.safeParse(req.body);
 
-  if (!verified) {
+  if (!verified.success) {
     return res.status(411).json({
       message: "Incorrect cred!",
+      error: verified.error.format(),
     });
   }
 
-  const userAlreadyExists = await user.findOne({
-    username: req.body.username,
-  });
+  try {
+    const userAlreadyExists = await user.findOne({
+      username: req.body.username,
+    });
 
-  if (userAlreadyExists) {
-    return res.status(401).json({
-      message: "User already exists! please sign in!",
+    if (userAlreadyExists) {
+      return res.status(401).json({
+        message: "User already exists! please sign in!",
+      });
+    }
+
+    const newUser = await user.create({
+      username: req.body.username,
+      password: req.body.password,
+      firstname: req.body.firstname,
+      lastname: req.body.lastname,
+    });
+
+    const userId = newUser._id;
+
+    await account.create({
+      userId: userId,
+      amount: Math.round((1 + Math.random() * 10000) * 1000) / 1000,
+    });
+
+    const jwtToken = jwt.sign(
+      {
+        id: userId,
+      },
+      jwtSecret
+    );
+
+    return res.status(200).json({
+      message: "User created successfully!",
+      token: jwtToken,
+    });
+  } catch (error) {
+    console.log("Signup error: ", error);
+    res.status(500).json({
+      message: "Internal server error",
     });
   }
-
-  const newUser = await user.create({
-    username: req.body.username,
-    password: req.body.password,
-    firstname: req.body.firstname,
-    lastname: req.body.lastname,
-  });
-
-  const userId = newUser._id;
-
-  await account.create({
-    userId: userId,
-    amount: Math.round((1 + Math.random() * 10000) * 1000) / 1000,
-  });
-
-  const jwtToken = jwt.sign(
-    {
-      id: userId,
-    },
-    jwtSecret
-  );
-
-  return res.status(200).json({
-    message: "User created successfully!",
-    token: jwtToken,
-  });
 });
 
 userRouter.post("/signin", async (req, res) => {
+  
+
   const signInSchemaVerification = userSignSchema.safeParse(req.body);
 
   if (!signInSchemaVerification.success) {
     return res.status(411).json({
       message: "Invalid credentials!",
+      error: signInSchemaVerification.error.format(),
     });
   }
+  try {
+    const userFound = await user.findOne({
+      username: req.body.username,
+    });
 
-  const userFound = await user.findOne({
-    username: req.body.username,
-  });
+    if (!userFound) {
+      return res.status(411).json({
+        message: "Error while logging in!",
+      });
+    }
 
-  if (!userFound) {
-    return res.status(411).json({
-      message: "Error while logging in!",
+    if (userFound.password != req.body.password) {
+      return res.status(401).json({
+        message: "Wrong cred!",
+      });
+    }
+    const jwtToken = jwt.sign({ id: userFound._id }, jwtSecret);
+
+    return res.status(200).json({
+      token: jwtToken,
+    });
+  } catch (error) {
+    console.log("signin error: ", error);
+    res.status(500).json({
+      message: "Internal server error!",
     });
   }
-
-  if (userFound.password != req.body.password) {
-    return res.status(401).json({
-      message: "Wrong cred!",
-    });
-  }
-  const jwtToken = jwt.sign({ id: userFound._id }, jwtSecret);
-
-  return res.status(200).json({
-    token: jwtToken,
-  });
 });
 
 userRouter.put("/", middleware, async (req, res) => {
@@ -151,7 +167,7 @@ userRouter.get("/bulk", middleware, async (req, res) => {
         },
       ],
     });
-    
+
     return res.json({
       users: users.map((user) => ({
         username: user.username,
